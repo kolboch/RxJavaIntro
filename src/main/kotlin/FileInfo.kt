@@ -1,6 +1,7 @@
 import io.reactivex.Observable
 import io.reactivex.Observable.just
 import io.reactivex.rxkotlin.toObservable
+import io.reactivex.schedulers.Schedulers
 import java.io.File
 
 data class FileInfo(
@@ -9,18 +10,22 @@ data class FileInfo(
         var filesCount: Long = 1
 )
 
+private var DEBUG = true
+
 fun fileToFileInfo(file: File): Observable<FileInfo> {
     if (file.isFile) {
-        return Observable.just(FileInfo(file, file.length()))
+        return Observable.just(FileInfo(file, file.length())).print({ "file: ${it.file}" })
     } else if (file.isDirectory) {
-        return file.listFiles().toObservable()
-                .flatMap { fileToFileInfo(it) }
-                .reduce(FileInfo(file), { acc, subFileInfo ->
-                    acc.bytes += subFileInfo.bytes
-                    acc.filesCount += subFileInfo.filesCount
-                    acc
-                }).toObservable()
-
+        return Observable.defer {
+            file.listFiles().toObservable()
+                    .flatMap { fileToFileInfo(it) }
+                    .reduce(FileInfo(file), { acc, subFileInfo ->
+                        acc.bytes += subFileInfo.bytes
+                        acc.filesCount += subFileInfo.filesCount
+                        acc
+                    }).toObservable()
+                    .print({ "reduced ${it.file}" })
+        }.subscribeOn(Schedulers.io())
     }
     return Observable.error(IllegalArgumentException("$file is neither a file or a directory"))
 }
@@ -34,15 +39,28 @@ fun sampleFunction(): Observable<Int> {
     return myObservableSample
 }
 
+fun <T> Observable<T>.print(message: (T) -> String = { "" }): Observable<T> {
+    return if (DEBUG)
+        this.map {
+            println("[${Thread.currentThread().name}] ${message(it)}")
+            it
+        }
+    else {
+        this
+    }
+}
+
 fun main(args: Array<String>) {
-    Observable.just(File("src/main/kotlin"))
+    Observable.just(File(".idea"))
+            .observeOn(Schedulers.io())
             .flatMap { fileToFileInfo(it) }
             .subscribe(
-                    { fileInfo -> println(fileInfo) },
+                    { fileInfo -> println("[${Thread.currentThread().name}] $fileInfo") },
                     { throwable -> throwable.printStackTrace() },
                     { println("On complete") }
             )
 //    println("Printing directory")
 //    val path = System.getProperty("user.dir")
 //    println("working directory: $path")
+    Thread.sleep(2000)
 }
