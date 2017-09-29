@@ -2,15 +2,18 @@ import io.reactivex.Observable
 import io.reactivex.Observable.just
 import io.reactivex.rxkotlin.toObservable
 import io.reactivex.schedulers.Schedulers
+import io.reactivex.schedulers.Schedulers.from
 import java.io.File
+import java.util.concurrent.Executors
+
+private var DEBUG = true
+val scheduler = from(Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors()))
 
 data class FileInfo(
         val file: File,
         var bytes: Long = 0,
         var filesCount: Long = 1
 )
-
-private var DEBUG = true
 
 fun fileToFileInfo(file: File): Observable<FileInfo> {
     if (file.isFile) {
@@ -25,7 +28,7 @@ fun fileToFileInfo(file: File): Observable<FileInfo> {
                         acc
                     }).toObservable()
                     .print({ "reduced ${it.file}" })
-        }.subscribeOn(Schedulers.io())
+        }.subscribeOn(scheduler)
     }
     return Observable.error(IllegalArgumentException("$file is neither a file or a directory"))
 }
@@ -51,7 +54,7 @@ fun <T> Observable<T>.print(message: (T) -> String = { "" }): Observable<T> {
 }
 
 fun main(args: Array<String>) {
-    Observable.just(File(".idea"))
+    Observable.just(File("C://Users/Karol"))
             .observeOn(Schedulers.io())
             .flatMap { fileToFileInfo(it) }
             .subscribe(
@@ -62,5 +65,5 @@ fun main(args: Array<String>) {
 //    println("Printing directory")
 //    val path = System.getProperty("user.dir")
 //    println("working directory: $path")
-    Thread.sleep(2000)
+    Thread.sleep(20000)
 }
